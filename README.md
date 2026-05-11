@@ -1,6 +1,6 @@
 # Digital Lending Apps — Lookup
 
-A searchable, fully-static directory of the **Reserve Bank of India's** public
+A searchable, fully-static lookup of the **Reserve Bank of India's** public
 list of *Digital Lending Apps used by Regulated Entities* (banks, NBFCs,
 housing-finance companies).
 
