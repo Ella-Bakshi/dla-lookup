@@ -26,7 +26,7 @@ housing-finance companies).
 
 ```
 .
-├── web/                     
+├── docs/                     
 │   ├── index.html
 │   ├── style.css
 │   ├── app.js
