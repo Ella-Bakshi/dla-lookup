@@ -33,9 +33,7 @@ housing-finance companies).
 │   ├── security.js
 │   ├── vendor/minisearch.js
 │   └── data/apps.json
-├── README.md
-├── LICENSE
-└── .gitignore
+└── README.md
 ```
 
 ## Acknowledgements & citation
