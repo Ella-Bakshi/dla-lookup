@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>RBI Digital Lending Apps — Directory</title>
+    <meta name="description" content="Searchable directory of RBI-registered Digital Lending Apps (DLAs) and Regulated Entities.">
+    <meta name="theme-color" content="#f7f6f2">
+
+    <!-- Security headers via <meta>. GitHub Pages does not allow custom
+         HTTP headers, so we ship what the browser will honour in-document.
+         (frame-ancestors is intentionally omitted because the spec says it
+         is ignored in <meta> form; framing is blocked by the JS guard at
+         the top of <body> instead.) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; form-action 'none'; base-uri 'self'; object-src 'none'; manifest-src 'self'">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+
+    <!-- Frame-busting fallback. Loaded synchronously before any other JS
+         so a malicious frame-loader cannot delay-init us. Safe no-op when
+         not framed. CSP-friendly: external file, no inline scripts. -->
+    <script src="security.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1f2e'/%3E%3Ctext x='50%25' y='60%25' text-anchor='middle' font-family='system-ui' font-size='38' font-weight='700' fill='%23f7f6f2'%3E%E2%82%B9%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a class="brand" href="./" aria-label="RBI Digital Lending Apps directory">
+                <span class="brand-mark" aria-hidden="true">&#8377;</span>
+                <span class="brand-text">
+                    <span class="brand-eyebrow">Unofficial directory</span>
+                    <h1>RBI&nbsp;Digital&nbsp;Lending&nbsp;Apps</h1>
+                </span>
+            </a>
+            <div class="header-actions">
+                <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
+                    <svg class="icon-sun" viewBox="0 0 16 16" aria-hidden="true" width="16" height="16"><circle cx="8" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.3 3.3l1.1 1.1M11.6 11.6l1.1 1.1M3.3 12.7l1.1-1.1M11.6 4.4l1.1-1.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    <svg class="icon-moon" viewBox="0 0 16 16" aria-hidden="true" width="16" height="16"><path d="M13 9.5A5.5 5.5 0 016.5 3a5.5 5.5 0 109 6.6 4 4 0 01-2.5-.1z" fill="currentColor"/></svg>
+                </button>
+            </div>
+            <dl class="stats" id="stats" aria-live="polite" aria-label="Directory totals">
+                <div class="stat">
+                    <dt>Listings</dt>
+                    <dd><b id="stat-listings">&hellip;</b></dd>
+                </div>
+                <div class="stat">
+                    <dt>Entities</dt>
+                    <dd><b id="stat-entities">&hellip;</b></dd>
+                </div>
+                <div class="stat">
+                    <dt>Platforms</dt>
+                    <dd><b id="stat-platforms">&hellip;</b></dd>
+                </div>
+            </dl>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="search-panel" aria-label="Search and filter controls">
+            <div class="search-row">
+                <label class="search-input-wrap" for="search-input">
+                    <svg class="icon-search" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+                        <path d="M20 20l-4.2-4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
+                    <input id="search-input" type="search" placeholder="Search by app, entity, developer, owner, email, phone&hellip;" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="200" inputmode="search">
+                    <kbd class="kbd-hint" aria-hidden="true">/</kbd>
+                    <button id="search-clear" type="button" class="clear-btn" aria-label="Clear search" hidden>
+                        <svg viewBox="0 0 16 16" aria-hidden="true" width="14" height="14"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                    </button>
+                </label>
+                <button type="button" id="filters-toggle" class="btn-ghost filters-toggle" aria-expanded="false" aria-controls="filters">
+                    <svg viewBox="0 0 16 16" aria-hidden="true" width="14" height="14"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                    <span>Filters</span>
+                    <span class="filters-count" id="filters-count" hidden>0</span>
+                </button>
+            </div>
+
+            <div class="filters" id="filters">
+                <label class="filter">
+                    <span>Entity type</span>
+                    <select id="filter-entity-type">
+                        <option value="">All</option>
+                    </select>
+                </label>
+                <label class="filter">
+                    <span>Platform</span>
+                    <select id="filter-platform">
+                        <option value="">All</option>
+                    </select>
+                </label>
+                <label class="filter">
+                    <span>Trust level</span>
+                    <select id="filter-trust">
+                        <option value="">All</option>
+                    </select>
+                </label>
+                <label class="filter filter-hidden" hidden>
+                    <span>Link health</span>
+                    <select id="filter-health">
+                        <option value="">All</option>
+                        <option value="has_broken">Has at least 1 broken link</option>
+                        <option value="all_broken">Every link broken</option>
+                        <option value="all_ok">All links OK</option>
+                    </select>
+                </label>
+                <label class="filter">
+                    <span>Sort by</span>
+                    <select id="sort-by">
+                        <option value="relevance">Relevance</option>
+                        <option value="entity_asc">Entity name (A&ndash;Z)</option>
+                        <option value="entity_desc">Entity name (Z&ndash;A)</option>
+                        <option value="dla_asc">App name (A&ndash;Z)</option>
+                        <option value="sr_no">Original order</option>
+                        <option value="risky_first">Risky first</option>
+                    </select>
+                </label>
+                <button type="button" id="reset-btn" class="btn-ghost reset-btn">Reset</button>
+            </div>
+
+            <div class="result-meta">
+                <span id="result-count">Loading data&hellip;</span>
+                <span id="active-group-pill" class="active-group-pill" hidden>
+                    <svg viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><path d="M6 10l-2 2a2.5 2.5 0 01-3.5-3.5l3-3a2.5 2.5 0 013.5 0M10 6l2-2a2.5 2.5 0 013.5 3.5l-3 3a2.5 2.5 0 01-3.5 0" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+                    <span id="active-group-label"></span>
+                    <button type="button" id="active-group-clear" aria-label="Clear co-lender filter">
+                        <svg viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </button>
+                </span>
+            </div>
+        </section>
+
+        <section class="results" id="results" aria-live="polite" aria-busy="false"></section>
+
+        <div class="load-more-wrap">
+            <button id="load-more" class="btn-primary" hidden>Show more results</button>
+        </div>
+
+        <section class="empty" id="empty" hidden>
+            <div class="empty-mark" aria-hidden="true">
+                <svg viewBox="0 0 48 48" width="48" height="48"><circle cx="22" cy="22" r="13" fill="none" stroke="currentColor" stroke-width="2"/><path d="M32 32l9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 22h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <h2>No matching listings</h2>
+            <p>Try removing filters, shortening the query, or searching by an alternative spelling.</p>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>Data source: RBI &mdash; <em>List of Digital Lending Apps used by Regulated Entities</em>.</p>
+            <p>Developer contact details enriched from public Google Play metadata.</p>
+        </div>
+    </footer>
+
+    <!-- Sub-Resource Integrity pins the vendor file to its known hash; any
+         tampering at-rest (or via a compromised hosting account) makes the
+         browser refuse to execute. Rebuild with `Get-FileHash -Algorithm SHA384`
+         if you ever update vendor/minisearch.js. -->
+    <script src="vendor/minisearch.js" integrity="sha384-g0EqC0ztAmrHQRoIxEGBacCSpVWXXiY+Vtg/twou+HeyvDp3B7440gAaiHnj9GJQ" crossorigin="anonymous"></script>
+    <script src="app.js" defer></script>
+</body>
+</html>
