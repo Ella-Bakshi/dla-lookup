@@ -578,6 +578,17 @@ summary:focus-visible {
 .badge-type[data-type="NBFC"]         { color: #1b7a4b; border-color: #c7e6d2; background: var(--color-success-bg); }
 .badge-type[data-type="HOUSING FINANCE COMPANY"] { color: #7a4a17; border-color: #ecd9bf; background: #fbf2e2; }
 
+/* Age badge - small "{N} yrs (YYYY)" pill on NBFC cards. Neutral
+   styling for every age - just a factual chip. Tooltip carries the
+   precise incorporation date and MCA status. */
+.badge-age {
+    background: var(--color-surface-2);
+    color: var(--color-muted);
+    border: 1px solid var(--color-border);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
 .card-meta {
     display: flex;
     flex-wrap: wrap;
@@ -966,6 +977,7 @@ mark.hl {
 [data-theme="dark"] .badge-type[data-type="BANK"]                     { color: #5cc8d0; }
 [data-theme="dark"] .badge-type[data-type="NBFC"]                     { color: #7fd6da; }
 [data-theme="dark"] .badge-type[data-type="HOUSING FINANCE COMPANY"]  { color: #d6c298; }
+[data-theme="dark"] .badge-age                                        { background: var(--color-surface-2); border-color: var(--color-border-2); color: var(--color-muted); }
 [data-theme="dark"] .pill-icon                                        { background: var(--color-surface-2); color: var(--color-text); }
 [data-theme="dark"] .pill-icon[data-platform="Google Play Store"]     { color: #5cc8d0; }
 [data-theme="dark"] .pill-icon[data-platform="Apple App Store"]       { color: var(--color-text); }
