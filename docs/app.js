@@ -457,6 +457,21 @@
         return `<span class="badge badge-type" data-type="${escapeHtml(t)}">${escapeHtml(formatEntityType(t))}</span>`;
     }
 
+    /** Small "{age} yrs ({year})" badge, only shown for NBFC entities that
+     *  successfully matched the data.gov.in MCA registry. Tooltip carries
+     *  the precise incorporation date. */
+    function ageBadge(r) {
+        if (r.entity_type !== "NBFC") return "";
+        const ci = r.company_info;
+        if (!ci || !ci.incorp_year) return "";
+        const year = String(ci.incorp_year).replace(/[^0-9]/g, "").slice(0, 4);
+        if (!year) return "";
+        const ageY = (ci.age_years != null) ? Math.floor(ci.age_years) : null;
+        const text = ageY != null ? `${ageY} yrs (${year})` : `(${year})`;
+        const tip  = ci.incorp_date ? `Incorporated ${ci.incorp_date}` : "";
+        return `<span class="badge badge-age" title="${escapeHtml(tip)}">${escapeHtml(text)}</span>`;
+    }
+
     function pillIconHtml(platformName) {
         const icon = PLATFORM_ICONS[platformName] || PLATFORM_ICONS["Other"];
         return `<span class="pill-icon" data-platform="${escapeHtml(platformName)}" aria-hidden="true">${icon}</span>`;
@@ -541,6 +556,7 @@
 
             <div class="card-meta">
                 ${typeBadge(r.entity_type)}
+                ${ageBadge(r)}
                 ${riskyMark}
                 <span class="id-tag">${idTag}</span>
             </div>
