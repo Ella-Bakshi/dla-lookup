@@ -151,6 +151,9 @@ summary:focus-visible {
     position: absolute;
     inset: 0;
     margin: auto;
+    width: 16px;
+    height: 16px;
+    display: block;
     transition: transform 360ms var(--ease-out), opacity 240ms var(--ease-out);
 }
 .theme-toggle .icon-sun  { opacity: 1; transform: rotate(0) scale(1); }
@@ -522,6 +525,18 @@ summary:focus-visible {
 }
 .card.is-risky:hover { border-color: #d9b3a8; }
 
+/* RBI cancelled-CoR - strongest (factual) red. Deeper rail + red-tinted
+   surface so it reads as more severe than the advisory Risky tag. */
+.card.is-cancelled {
+    --card-rail: #b3261e;
+    border-color: #e6b3ad;
+    background:
+        linear-gradient(0deg, rgba(179,38,30,0.035), rgba(179,38,30,0.035)),
+        var(--color-surface);
+}
+.card.is-cancelled::before { width: 4px; }
+.card.is-cancelled:hover { border-color: #d28d83; }
+
 @keyframes cardIn {
     from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -719,6 +734,32 @@ summary:focus-visible {
     line-height: 1.4;
 }
 .risk-mark svg { width: 11px; height: 11px; }
+
+/* Cancelled-CoR mark - deeper, solid red so it outranks the advisory Risky
+   tag at a glance (white text on danger red). */
+.risk-mark.is-cancelled {
+    background: var(--color-danger);
+    color: #fff;
+    border-color: var(--color-danger-2);
+    cursor: help;
+}
+
+/* Brief explanatory note shown on a cancelled-CoR NBFC card. */
+.cancel-note {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--color-danger-2);
+    background: var(--color-danger-bg);
+    border: 1px solid #f1cfc8;
+    border-radius: var(--radius-md);
+    padding: 9px 11px;
+}
+.cancel-grid dt { color: var(--color-muted); }
+[data-theme="dark"] .cancel-note {
+    color: #f0b4a8;
+    background: var(--color-danger-bg);
+    border-color: #5e2c25;
+}
 
 .co-lender-chip {
     display: inline-flex;
@@ -997,6 +1038,20 @@ mark.hl {
 [data-theme="dark"] .risk-mark { background: var(--color-danger-bg); border-color: #4a2620; color: var(--color-danger); }
 [data-theme="dark"] .card.is-risky { border-color: #4a2620; }
 [data-theme="dark"] .card.is-risky:hover { border-color: #5a2e26; }
+/* Cancelled-CoR in dark mode: muted-but-clearly-red surface, bright red badge. */
+[data-theme="dark"] .card.is-cancelled {
+    --card-rail: #e0554a;
+    border-color: #5e2c25;
+    background:
+        linear-gradient(0deg, rgba(224,85,74,0.06), rgba(224,85,74,0.06)),
+        var(--color-surface);
+}
+[data-theme="dark"] .card.is-cancelled:hover { border-color: #7a3a30; }
+[data-theme="dark"] .risk-mark.is-cancelled {
+    background: #c0392b;
+    color: #fff;
+    border-color: #e0554a;
+}
 [data-theme="dark"] mark.hl { color: var(--color-ink); }
 [data-theme="dark"] .kv-val a, [data-theme="dark"] .contact-grid a { color: var(--color-link); border-bottom-color: rgba(92,200,208,0.35); }
 [data-theme="dark"] .kv-val a:hover, [data-theme="dark"] .contact-grid a:hover { color: var(--color-primary-2); border-bottom-color: var(--color-primary-2); }

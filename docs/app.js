@@ -472,6 +472,32 @@
         return `<span class="badge badge-age" title="${escapeHtml(tip)}">${escapeHtml(text)}</span>`;
     }
 
+    /** Trust mark shown in the card-meta row.
+     *  - "CoR Cancelled": the RBI cancelled this NBFC's Certificate of
+     *    Registration (factual, strongest signal) -> solid-red badge whose
+     *    tooltip cites the RBI press release / circular, the cancellation
+     *    date and the CoR number.
+     *  - "Risky": advisory flag -> red triangle badge.
+     *  Anything else renders nothing. */
+    function trustMark(r) {
+        if (r.trust_level === "CoR Cancelled") {
+            const cc = r.cor_cancelled || {};
+            const banSign =
+                `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+            const tipParts = [
+                "Registration cancelled by RBI \u2014 this entity may no longer carry on the business of an NBFC.",
+                cc.cor_cancelled ? `CoR cancelled on ${cc.cor_cancelled}` : "",
+                cc.cor_no ? `CoR No. ${cc.cor_no}` : "",
+                cc.source ? `Source: ${cc.source}` : "Source: RBI press release",
+            ].filter(Boolean);
+            return `<span class="risk-mark is-cancelled" role="note" title="${escapeHtml(tipParts.join(" \u00b7 "))}">${banSign} CoR Cancelled</span>`;
+        }
+        if (r.trust_level === "Risky") {
+            return `<span class="risk-mark" role="note"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5L15 14H1L8 1.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v3.5M8 11.5v0.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Risky</span>`;
+        }
+        return "";
+    }
+
     function pillIconHtml(platformName) {
         const icon = PLATFORM_ICONS[platformName] || PLATFORM_ICONS["Other"];
         return `<span class="pill-icon" data-platform="${escapeHtml(platformName)}" aria-hidden="true">${icon}</span>`;
@@ -505,8 +531,47 @@
         return `<span class="${pillCls}" ${titleAttr}>${inner}</span>`;
     }
 
+    /** Dedicated card for an RBI cancelled-CoR NBFC (no app, no officers) -
+     *  shows the cancellation facts and a red badge whose tooltip cites the
+     *  RBI press release. */
+    function renderCancelledCard(r, tokens) {
+        const cc = r.cor_cancelled || {};
+        const safeId = Number(r.id) || 0;
+        const rows = [];
+        if (cc.cor_no)        rows.push(["CoR No.",   cc.cor_no]);
+        if (cc.cor_cancelled) rows.push(["Cancelled", cc.cor_cancelled]);
+        if (cc.cor_issued)    rows.push(["Issued",    cc.cor_issued]);
+        if (cc.state)         rows.push(["Registered", cc.state]);
+        if (cc.source)        rows.push(["Source",    cc.source]);
+        const grid = rows.map(([k, v]) =>
+            `<dt>${escapeHtml(k)}</dt><dd>${highlight(String(v), tokens)}</dd>`).join("");
+        return `
+        <article class="card is-cancelled" data-id="${safeId}">
+            <div class="card-header">
+                <div class="card-heading">
+                    <h3 class="card-title">${highlight(r.dla_name || r.entity_name, tokens)}</h3>
+                    <p class="card-subtitle">${highlight(r.entity_name, tokens)}</p>
+                </div>
+            </div>
+            <div class="card-meta">
+                ${typeBadge(r.entity_type)}
+                ${trustMark(r)}
+            </div>
+            <div class="cancel-note" role="note">
+                RBI cancelled this company&rsquo;s Certificate of Registration. It shall
+                not transact the business of a Non-Banking Financial Institution.
+            </div>
+            <dl class="contact-grid cancel-grid">
+                ${grid}
+            </dl>
+        </article>`;
+    }
+
     function renderCard(r, tokens) {
-        const riskyCls = r.trust_level === "Risky" ? " is-risky" : "";
+        if (r.is_cancelled_entry) return renderCancelledCard(r, tokens);
+        const riskyCls = r.trust_level === "Risky"         ? " is-risky"
+                       : r.trust_level === "CoR Cancelled"  ? " is-cancelled"
+                       : "";
         const dlaName  = r.dla_name || "(Unnamed app)";
         const webAbs   = toAbsoluteUrl(r.entity_website);
         // Entity website link — never decorated with a "broken" indicator,
@@ -519,9 +584,7 @@
             ? r.platforms.map((p) => platformPill(p, tokens)).join("")
             : `<span class="platform-pill is-disabled">${pillIconHtml("Other")}<span class="pill-label">No listing link</span></span>`;
 
-        const riskyMark = r.trust_level === "Risky"
-            ? `<span class="risk-mark" role="note"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5L15 14H1L8 1.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v3.5M8 11.5v0.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Risky</span>`
-            : "";
+        const riskyMark = trustMark(r);
 
         // Defence-in-depth: cast every numeric field to Number() before
         // string interpolation so a poisoned apps.json cannot smuggle HTML
