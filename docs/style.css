@@ -347,7 +347,6 @@ summary:focus-visible {
     font-size: 11px;
     font-weight: 700;
 }
-
 /* Filters — flex-wrap so selects + Reset coexist cleanly on every width. */
 .filters {
     margin-top: 12px;
@@ -443,6 +442,16 @@ summary:focus-visible {
     font-variant-numeric: tabular-nums;
 }
 #result-count { color: var(--color-text); }
+
+/* Bulk-check "not found" note — forced onto its own line below the count. */
+.search-note {
+    flex-basis: 100%;
+    margin: -2px 0 0;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+}
 
 .active-group-pill {
     display: inline-flex;

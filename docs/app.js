@@ -21,6 +21,9 @@
         lastQuery:   "",
         lastFilters: {},
         lastSort:    "relevance",
+        bulkMode:    false,
+        bulkIndices: null,     // { pkg: Map, apple: Map } built lazily
+        bulkCountText: "",
     };
 
     /* ----------------------------- DOM ---------------------------------- */
@@ -49,6 +52,7 @@
         activeGroupLabel:  $("#active-group-label"),
         activeGroupClear:  $("#active-group-clear"),
         themeToggle:       $("#theme-toggle"),
+        searchNote:        $("#search-note"),
     };
 
     /* ---------------------------- Theme --------------------------------- */
@@ -126,16 +130,22 @@
      *  set is English-only, so any non-Latin code points in a query are
      *  either typos or an attempt to slip payloads past naive filters
      *  (homoglyph attacks, CJK / RTL / zero-width tricks, emoji-encoded
-     *  shellcode, etc.). We also strip control chars (< 0x20) and DEL
-     *  (0x7F) and hard-cap the length so a programmatic value-set cannot
-     *  bypass the input element's maxlength attribute. Returns the cleaned
-     *  string. */
+     *  shellcode, etc.). Tab / CR / LF are first folded to a single space so
+     *  a bulk paste keeps its token gaps (a single-line <input> would
+     *  otherwise drop them); every other control char (< 0x20) and DEL (0x7F)
+     *  is removed. The length is hard-capped so a programmatic value-set
+     *  cannot bypass the input element's maxlength attribute. */
     const NON_ASCII_RE = /[^\x20-\x7E]+/g;
-    const MAX_QUERY_LEN = 200;
-    function sanitizeAscii(s) {
+    const MAX_QUERY_LEN = 200;     // cap for a single free-text query / token
+    const MAX_INPUT_LEN = 4000;    // cap for the raw search box (matches the
+                                   // input's maxlength) so a bulk paste of many
+                                   // links survives sanitisation before it is
+                                   // split into individual entries.
+    function sanitizeAscii(s, maxLen) {
         if (!s) return "";
-        let out = String(s).replace(NON_ASCII_RE, "");
-        if (out.length > MAX_QUERY_LEN) out = out.slice(0, MAX_QUERY_LEN);
+        const cap = (typeof maxLen === "number" && maxLen > 0) ? maxLen : MAX_QUERY_LEN;
+        let out = String(s).replace(/[\t\r\n]+/g, " ").replace(NON_ASCII_RE, "");
+        if (out.length > cap) out = out.slice(0, cap);
         return out;
     }
 
@@ -344,14 +354,33 @@
     function runSearch() {
         // Belt-and-braces: even if the input listener was bypassed (e.g. by
         // DevTools or a programmatic value set), drop anything outside
-        // printable ASCII before it reaches MiniSearch.
-        const q = sanitizeAscii(els.input.value).trim();
+        // printable ASCII before it reaches MiniSearch. The raw box may hold a
+        // bulk paste, so cap at MAX_INPUT_LEN here and narrow per-query/token.
+        const raw = sanitizeAscii(els.input.value, MAX_INPUT_LEN).trim();
         const filters = currentFilters();
         const sortKey = els.sortBy.value;
-        state.lastQuery   = q;
         state.lastFilters = filters;
         state.lastSort    = sortKey;
-        els.clearBtn.hidden = q.length === 0;
+        els.clearBtn.hidden = raw.length === 0;
+
+        // Auto bulk-check: trigger when the box holds multiple entries, or a
+        // single entry that is clearly a store link / package id. Plain words,
+        // bare domains and bare numbers stay normal searches so website and
+        // phone lookups keep working.
+        const entries = splitEntries(raw);
+        const isBulk = entries.length >= 2 ||
+                       (entries.length === 1 && looksStructured(entries[0]));
+        if (isBulk) {
+            runBulkSearch(entries, filters);
+            return;
+        }
+
+        // ---- Normal search: always leave bulk mode. ----
+        if (state.bulkMode) { state.bulkMode = false; state.bulkCountText = ""; }
+        clearSearchNote();
+
+        const q = raw.slice(0, MAX_QUERY_LEN);
+        state.lastQuery = q;
 
         let candidates;
         if (state.coLenderFilter) {
@@ -420,6 +449,13 @@
         els.results.setAttribute("aria-busy", "true");
         els.results.innerHTML = slice.map((r) => renderCard(r, tokens)).join("");
         els.results.setAttribute("aria-busy", "false");
+
+        if (state.bulkMode) {
+            // In bulk mode the count line is set by runBulkSearch(); preserve it.
+            els.resultCount.textContent = state.bulkCountText;
+            els.loadMore.hidden = end >= total;
+            return;
+        }
 
         const filterDescription = describeFilters();
         if (total === 0) {
@@ -699,6 +735,203 @@
             </details>`;
     }
 
+    /* --------------------------- Bulk check ----------------------------- */
+    /** Pull an Android package name out of any store URL / custom scheme. */
+    function pkgFromLink(link) {
+        const s = String(link || "");
+        const m = s.match(/[?&]id=([a-zA-Z0-9_.]+)/) || s.match(/[?&]pkg=([a-zA-Z0-9_.]+)/);
+        return m ? m[1] : null;
+    }
+    /** Pull an Apple App Store numeric id out of an apps.apple.com URL. */
+    function appleFromLink(link) {
+        const m = String(link || "").match(/\/id(\d{4,12})\b/);
+        return m ? m[1] : null;
+    }
+
+    /** Build (once, lazily) two lookup maps over the dataset:
+     *  package-name -> [listings]  and  apple-app-id -> [listings].
+     *  Pulls identifiers from BOTH the package_names/apple_app_ids fields AND
+     *  the platform links, because the source data's id fields are sometimes
+     *  incomplete while the links always carry the id. */
+    function bulkIndices() {
+        if (state.bulkIndices) return state.bulkIndices;
+        const pkg = new Map();
+        const apple = new Map();
+        const addPkg = (val, r) => {
+            const k = String(val).toLowerCase();
+            if (!k) return;
+            if (!pkg.has(k)) pkg.set(k, []);
+            if (!pkg.get(k).includes(r)) pkg.get(k).push(r);
+        };
+        const addApple = (val, r) => {
+            const k = String(val);
+            if (!k) return;
+            if (!apple.has(k)) apple.set(k, []);
+            if (!apple.get(k).includes(r)) apple.get(k).push(r);
+        };
+        for (const r of state.listings) {
+            (r.package_names || []).forEach((p) => addPkg(p, r));
+            (r.apple_app_ids || []).forEach((a) => addApple(a, r));
+            (r.platforms || []).forEach((p) => {
+                const pk = pkgFromLink(p.link);
+                if (pk) addPkg(pk, r);
+                const ap = appleFromLink(p.link);
+                if (ap) addApple(ap, r);
+            });
+        }
+        state.bulkIndices = { pkg, apple };
+        return state.bulkIndices;
+    }
+
+    /** Split the search box into discrete entries. A single-line <input>
+     *  strips newlines, so a multi-link paste can arrive glued together; we
+     *  re-insert a separator before every URL scheme so concatenated links
+     *  split cleanly. The mode is then chosen so normal multi-word queries are
+     *  never broken on spaces:
+     *    - any URL present, or every whitespace token is a link / package id
+     *      -> split on whitespace + comma / semicolon / pipe (structured list);
+     *    - otherwise 2+ comma / semicolon / pipe parts -> use those (keeps
+     *      multi-word free-text entries intact);
+     *    - otherwise the whole box is one entry (a normal query, or a single
+     *      package / id). Blanks dropped, count hard-capped. */
+    function splitEntries(raw) {
+        if (!raw) return [];
+        const s = String(raw)
+            .replace(/[\t\r\n]+/g, " ")
+            .replace(/(https?:\/\/|oaps:\/\/|vivomarket:\/\/|market:\/\/)/gi, " $1")
+            .trim();
+        if (!s) return [];
+        const wsParts    = s.split(/[\s,;|]+/).map((t) => t.trim()).filter(Boolean);
+        const delimParts = s.split(/[,;|]+/).map((t) => t.trim()).filter(Boolean);
+        const hasUrl = /:\/\//.test(s);
+        const allWsStructured = wsParts.length >= 2 && wsParts.every(looksStructured);
+
+        let parts;
+        if (hasUrl || allWsStructured) {
+            parts = wsParts;
+        } else if (delimParts.length >= 2) {
+            parts = delimParts;
+        } else {
+            parts = [s];
+        }
+        return parts.slice(0, 1000);
+    }
+
+    /** Does a single entry look like a store link / package id (something to
+     *  bulk-check) rather than free text? Deliberately conservative for single
+     *  inputs: bare numbers (phone numbers) and two-label domains (websites)
+     *  are NOT treated as structured, so normal search still finds them.
+     *  All regexes are linear (no catastrophic backtracking). */
+    function looksStructured(tok) {
+        if (/:\/\//.test(tok)) return true;                                        // any URL scheme
+        if (/[?&](id|pkg)=[a-zA-Z0-9_.]+/.test(tok)) return true;                  // store query id
+        if (/\/id\d{4,12}\b/.test(tok)) return true;                               // apple path id
+        if (/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+){2,}$/.test(tok)) return true; // 3+ label package
+        return false;
+    }
+
+    /** Classify one token as a package name, an Apple id, or free text.
+     *  All regexes are linear (no catastrophic backtracking). */
+    function classifyToken(s) {
+        let m = s.match(/[?&]id=([a-zA-Z0-9_.]+)/);                 // Play / generic ?id=
+        if (m) return { kind: "package", key: m[1] };
+        m = s.match(/[?&]pkg=([a-zA-Z0-9_.]+)/);                    // oaps:// / vivomarket
+        if (m) return { kind: "package", key: m[1] };
+        m = s.match(/\/id(\d{4,12})\b/);                            // Apple /idNNNN
+        if (m) return { kind: "apple", key: m[1] };
+        if (/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+){1,}$/.test(s)) // bare package
+            return { kind: "package", key: s };
+        if (/^\d{6,12}$/.test(s))                                   // bare Apple id
+            return { kind: "apple", key: s };
+        return { kind: "text", key: s };                           // fall back to name search
+    }
+
+    function clearSearchNote() {
+        if (!els.searchNote) return;
+        els.searchNote.textContent = "";
+        els.searchNote.hidden = true;
+    }
+
+    /** Auto bulk-check driver. Receives the already-split, ASCII-sanitised
+     *  entries from runSearch(), resolves each to listing(s) via the package /
+     *  apple link indices (falling back to a name search for free text), then
+     *  renders the de-duplicated matches with cancelled / risky listings
+     *  surfaced first. Current filters still apply. The compact "not found"
+     *  note is written with textContent (never HTML). */
+    function runBulkSearch(entries, filters) {
+        const tokens = entries.slice(0, 1000);
+        const idx = bulkIndices();
+        const matched = new Map();   // listing id -> listing (dedup)
+        const notFound = [];
+        let matchedInputs = 0;
+
+        for (const tok of tokens) {
+            const c = classifyToken(tok);
+            let hits = [];
+            if (c.kind === "package") {
+                hits = idx.pkg.get(c.key.toLowerCase()) || [];
+            } else if (c.kind === "apple") {
+                hits = idx.apple.get(c.key) || [];
+            } else {
+                // free-text name lookup via MiniSearch (ASCII-sanitised, 200-cap)
+                const q = sanitizeAscii(c.key).trim();
+                if (q.length >= 2 && state.search) {
+                    const r = state.search.search(q, { prefix: true, fuzzy: 0.1 });
+                    hits = r.slice(0, 3).map((h) => state.listingsById.get(h.id)).filter(Boolean);
+                }
+            }
+            if (hits.length) {
+                matchedInputs += 1;
+                hits.forEach((h) => matched.set(h.id, h));
+            } else {
+                notFound.push(tok);
+            }
+        }
+
+        let cards = applyFilters([...matched.values()], filters);
+        // Surface cancelled / risky first so dangerous matches are obvious.
+        cards.sort((a, b) => {
+            const rank = (x) => x.trust_level === "CoR Cancelled" ? 0
+                              : x.trust_level === "Risky"          ? 1 : 2;
+            return (rank(a) - rank(b)) ||
+                   a.entity_name.localeCompare(b.entity_name) ||
+                   (a.dla_name || "").localeCompare(b.dla_name || "");
+        });
+
+        state.bulkMode = true;
+        state.lastQuery = "";
+        state.coLenderFilter = null;     // a bulk paste replaces any co-lender view
+        state.filtered = cards;
+        state.page = 0;
+
+        const flagged = cards.filter((c) =>
+            c.trust_level === "CoR Cancelled" || c.trust_level === "Risky").length;
+        state.bulkCountText =
+            `Bulk check: ${matchedInputs} of ${tokens.length} item(s) matched ` +
+            `${cards.length} listing(s)` +
+            (flagged ? ` \u2014 ${flagged} flagged (risky / cancelled)` : "") +
+            `; ${notFound.length} not found`;
+
+        updateActiveGroupPill();
+        updateFiltersCount();
+        render();
+
+        // Compact not-found note (textContent only — never HTML).
+        if (els.searchNote) {
+            if (notFound.length) {
+                const shown = notFound.slice(0, 12);
+                let note = `Not found (${notFound.length}): ` + shown.join(", ");
+                if (notFound.length > shown.length) {
+                    note += `, +${notFound.length - shown.length} more`;
+                }
+                els.searchNote.textContent = note;
+                els.searchNote.hidden = false;
+            } else {
+                clearSearchNote();
+            }
+        }
+    }
+
     /* ----------------------------- Wiring ------------------------------- */
     function attachEvents() {
         // Synchronous strip BEFORE the debounced search fires. Anything outside
@@ -716,7 +949,10 @@
         // Block beforeinput where the browser supports it - prevents the
         // non-ASCII char from ever appearing in the box on supported browsers.
         els.input.addEventListener("beforeinput", (e) => {
-            if (typeof e.data === "string" && /[^\x20-\x7E]/.test(e.data)) {
+            // Allow tab / CR / LF through (they get folded to spaces and let a
+            // multi-line paste survive); still block true non-ASCII so
+            // homoglyph / RTL / zero-width payloads never enter the box.
+            if (typeof e.data === "string" && /[^\x20-\x7E\t\r\n]/.test(e.data)) {
                 e.preventDefault();
             }
         });
