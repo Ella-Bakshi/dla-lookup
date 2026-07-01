@@ -7,6 +7,7 @@ housing-finance companies).
 > **Disclaimer.** This is an *unofficial* reformatting of the RBI dataset
 > for easier search. Trust ratings, if any, are advisory only.
 
+Link to access - https://ella-bakshi.github.io/dla-lookup/
 
 ## Features
 
@@ -16,10 +17,10 @@ housing-finance companies).
   Vivo, OPPO, Website) with publisher links.
 - Grievance-officer contacts from the RBI sheet.
 - Developer contacts enriched from public Google Play metadata.
-- **Co-lender** chip — when a single product is co-lent by multiple regulated
+- **Co-lender** chip - when a single product is co-lent by multiple regulated
   entities (e.g. one product under 12 REs), one click pivots to all siblings.
 - Full-text search powered by [MiniSearch](https://github.com/lucaong/minisearch)
-  (vendored locally — no CDNs at runtime).
+  (vendored locally - no CDNs at runtime).
 - Light + Dark theme.
 
 ## Repository layout
@@ -38,7 +39,7 @@ housing-finance companies).
 
 ## Acknowledgements & citation
 
-- **Data**: Reserve Bank of India — *List of Digital Lending Apps used by
+- **Data**: Reserve Bank of India - *List of Digital Lending Apps used by
   Regulated Entities*.
 - **Search**: [MiniSearch](https://github.com/lucaong/minisearch) by Luca
   Ongaro, MIT.
