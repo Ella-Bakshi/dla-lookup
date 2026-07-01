@@ -7,7 +7,7 @@ housing-finance companies).
 > **Disclaimer.** This is an *unofficial* reformatting of the RBI dataset
 > for easier search. Trust ratings, if any, are advisory only.
 
-Link to access - https://ella-bakshi.github.io/dla-lookup/
+**Live:** [DLA Lookup](https://ella-bakshi.github.io/dla-lookup/) 
 
 ## Features
 
