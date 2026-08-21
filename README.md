@@ -11,7 +11,7 @@ housing-finance companies).
 
 ## Features
 
-- 1,256 listings grouped from the RBI source (one card per *entity × DLA*
+- 1,540 listings grouped from the RBI source (one card per *entity × DLA*
   rather than one card per platform).
 - Cross-platform pills (Play Store, App Store, Samsung, Indus, Xiaomi, Huawei,
   Vivo, OPPO, Website) with publisher links.
